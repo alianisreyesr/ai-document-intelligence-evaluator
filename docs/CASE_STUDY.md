@@ -22,4 +22,4 @@ Lexical groundedness cannot detect every contradiction or valid paraphrase. Prod
 
 ## Verified result
 
-The synthetic golden set contains one passing case and one intentionally failing case. Nine automated tests verify metric behavior, configurable thresholds, API boundaries, dashboard rendering, batch aggregation, failure diagnostics, and HTML/JSON export. The demonstration report produces a 50% pass rate so reviewers can inspect both success and failure evidence.
+The synthetic golden set contains one passing case and one intentionally failing case. Ten automated tests verify metric behavior, configurable thresholds, API boundaries, interactive Streamlit rendering, batch aggregation, failure diagnostics, and HTML/JSON export. The demonstration report produces a 50% pass rate so reviewers can inspect both success and failure evidence.

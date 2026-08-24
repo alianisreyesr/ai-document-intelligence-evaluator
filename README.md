@@ -2,6 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-evaluation_API-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-dashboard-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
 ![AI](https://img.shields.io/badge/Applied_AI-evaluation-6F42C1?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-2E7D32?style=flat-square)
 
@@ -9,7 +10,7 @@
 
 A provider-neutral evaluation harness for document-question answering. It scores evidence coverage, citation validity, lexical groundedness, latency, and estimated cost before a result is accepted for human review.
 
-[Evaluation demo](#quick-start) · [Case study](docs/CASE_STUDY.md) · [Metrics](docs/METRICS.md) · [Source](https://github.com/alianisreyesr/ai-document-intelligence-evaluator)
+[Evaluation demo](#quick-start) · [Case study](docs/CASE_STUDY.md) · [Architecture](docs/ARCHITECTURE.md) · [Metrics](docs/METRICS.md) · [Source](https://github.com/alianisreyesr/ai-document-intelligence-evaluator)
 
 > **AI boundary:** The documents and answers are fictional. Scores support evaluation and triage; they do not prove factual correctness and must not replace qualified human review.
 
@@ -42,6 +43,7 @@ flowchart LR
   C["Retrieved document context"] --> D["Deterministic evaluator"]
   B --> D
   D --> E["Metric record and decision"]
+  E --> H["Python / Streamlit quality dashboard"]
   E -->|passes thresholds| F["Human review queue"]
   E -->|fails thresholds| G["Failure analysis"]
 ```
@@ -54,6 +56,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m app.cli data/evaluation_cases.json
 python -m app.report --input data/evaluation_cases.json --output reports/evaluation-dashboard.html
+streamlit run dashboard.py
 python -m pytest
 uvicorn app.main:app --reload
 ```
@@ -79,7 +82,7 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - Per-case latency and cost observability
 - Batch pass-rate, average metric, and failure-frequency reporting
 - Threshold decisions and human-review routing
-- Self-contained HTML/JSON evaluation report
+- Interactive Python/Streamlit dashboard and self-contained HTML/JSON evaluation report
 - Synthetic golden dataset and regression tests
 
 ## Limitations
