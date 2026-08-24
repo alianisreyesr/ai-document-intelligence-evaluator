@@ -1,0 +1,14 @@
+name: Evaluation gap
+description: Propose a missing risk, case, or metric.
+title: "[Evaluation gap]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes: { label: Risk or failure mode }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Synthetic example }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Expected evaluation behavior }
+    validations: { required: true }

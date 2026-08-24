@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "CASE-001",
+    "documents": [
+      {"id": "DOC-RET-01", "text": "Returns are accepted within 30 days when the customer provides an order number."},
+      {"id": "DOC-RET-02", "text": "Refunds are issued to the original payment method after the returned item is inspected."}
+    ],
+    "expected_document_ids": ["DOC-RET-01", "DOC-RET-02"],
+    "required_facts": ["30 days", "original payment method"],
+    "candidate": {
+      "answer": "Returns are accepted within 30 days with an order number. Refunds go to the original payment method after inspection.",
+      "citations": ["DOC-RET-01", "DOC-RET-02"],
+      "latency_ms": 420,
+      "cost_usd": 0.0018
+    }
+  },
+  {
+    "case_id": "CASE-002",
+    "documents": [
+      {"id": "DOC-SHIP-01", "text": "Standard delivery normally arrives in three to five business days."},
+      {"id": "DOC-SHIP-02", "text": "Expedited delivery is available only in the continental United States."}
+    ],
+    "expected_document_ids": ["DOC-SHIP-01", "DOC-SHIP-02"],
+    "required_facts": ["three to five business days", "continental United States"],
+    "candidate": {
+      "answer": "Standard delivery arrives in three to five business days and expedited service is available worldwide.",
+      "citations": ["DOC-SHIP-01", "DOC-MISSING"],
+      "latency_ms": 1280,
+      "cost_usd": 0.0042
+    }
+  }
+]
