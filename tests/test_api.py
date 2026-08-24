@@ -6,6 +6,13 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_dashboard_exposes_quality_evidence():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "AI Quality Dashboard" in response.text
+    assert "Failure diagnostics" in response.text
+
+
 def test_health_requires_human_review():
     response = client.get("/health")
     assert response.status_code == 200

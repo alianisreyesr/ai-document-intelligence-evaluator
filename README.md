@@ -13,6 +13,12 @@ A provider-neutral evaluation harness for document-question answering. It scores
 
 > **AI boundary:** The documents and answers are fictional. Scores support evaluation and triage; they do not prove factual correctness and must not replace qualified human review.
 
+## Portfolio preview
+
+![AI quality dashboard showing pass rate, citation validity, groundedness, golden-set results, and failure diagnostics](docs/assets/ai-quality-dashboard.png)
+
+The visual is generated from the synthetic golden set and the same deterministic scoring code exercised by the API and tests.
+
 ## Why this project
 
 An AI application is not trustworthy because it produces fluent text. Teams need repeatable evidence about whether answers reference available sources, cover expected facts, remain grounded in retrieved context, and operate within latency and cost targets.
@@ -47,6 +53,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m app.cli data/evaluation_cases.json
+python -m app.report --input data/evaluation_cases.json --output reports/evaluation-dashboard.html
 python -m pytest
 uvicorn app.main:app --reload
 ```
@@ -70,7 +77,9 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - Deterministic and explainable scoring
 - Provider-neutral request/response contracts
 - Per-case latency and cost observability
+- Batch pass-rate, average metric, and failure-frequency reporting
 - Threshold decisions and human-review routing
+- Self-contained HTML/JSON evaluation report
 - Synthetic golden dataset and regression tests
 
 ## Limitations
