@@ -1,7 +1,5 @@
 # AI Document Intelligence Evaluator
 
-[![CI](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/ci.yml/badge.svg)](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/codeql.yml/badge.svg)](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/codeql.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-evaluation_API-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![AI](https://img.shields.io/badge/Applied_AI-evaluation-6F42C1?style=flat-square)
