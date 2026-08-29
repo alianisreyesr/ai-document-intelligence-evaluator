@@ -7,7 +7,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from app.evaluator import score_case
+from app.evaluator import METRIC_NAMES, score_case
 
 
 def evaluate_batch(cases: list[dict]) -> dict[str, object]:
@@ -17,7 +17,7 @@ def evaluate_batch(cases: list[dict]) -> dict[str, object]:
     passed = sum(result["passed"] for result in results)
     averages = {
         metric: round(sum(float(result["metrics"][metric]) for result in results) / total, 4) if total else 0
-        for metric in ("citation_validity", "evidence_coverage", "groundedness", "required_fact_recall", "latency_ms", "cost_usd")
+        for metric in METRIC_NAMES
     }
     return {
         "summary": {"total": total, "passed": passed, "failed": total - passed, "pass_rate": round(passed / total, 4) if total else 0},

@@ -1,8 +1,9 @@
 """Evaluation API and synthetic evidence dashboard."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -28,12 +29,24 @@ class Candidate(BaseModel):
     cost_usd: float = Field(ge=0)
 
 
+class ThresholdOverrides(BaseModel):
+    """Per-field overrides for Thresholds; unset fields keep the default."""
+
+    citation_validity: Optional[float] = None
+    evidence_coverage: Optional[float] = None
+    groundedness: Optional[float] = None
+    required_fact_recall: Optional[float] = None
+    latency_ms: Optional[int] = None
+    cost_usd: Optional[float] = None
+
+
 class EvaluationRequest(BaseModel):
     case_id: str
     documents: list[Document]
     expected_document_ids: list[str]
     required_facts: list[str]
     candidate: Candidate
+    thresholds: Optional[ThresholdOverrides] = None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -53,4 +66,16 @@ def thresholds() -> dict[str, float | int]:
 
 @app.post("/api/evaluations")
 def evaluate(payload: EvaluationRequest) -> dict[str, Any]:
-    return score_case(payload.model_dump())
+    # GET /api/thresholds advertises these as configurable, but this
+    # endpoint always scored against Thresholds() and had no field to
+    # accept an override — a real capability gap versus that framing.
+    limits = Thresholds()
+    if payload.thresholds is not None:
+        overrides = {
+            field: value
+            for field, value in payload.thresholds.model_dump().items()
+            if value is not None
+        }
+        limits = replace(limits, **overrides)
+    case = payload.model_dump(exclude={"thresholds"})
+    return score_case(case, limits)
