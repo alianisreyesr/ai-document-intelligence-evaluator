@@ -9,6 +9,18 @@ from dataclasses import dataclass
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 STOP_WORDS = {"a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "is", "it", "of", "on", "or", "that", "the", "to", "was", "with"}
 
+# Single source of truth for the six scored metric names, so evaluator.py's
+# failure dict and report.py's averages dict can't drift if a metric is
+# ever added, renamed, or removed.
+METRIC_NAMES = (
+    "citation_validity",
+    "evidence_coverage",
+    "groundedness",
+    "required_fact_recall",
+    "latency_ms",
+    "cost_usd",
+)
+
 
 def tokens(text: str) -> set[str]:
     return {token for token in TOKEN_PATTERN.findall(text.lower()) if token not in STOP_WORDS and len(token) > 1}
