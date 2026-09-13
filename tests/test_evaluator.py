@@ -28,6 +28,19 @@ def test_unsupported_candidate_has_explainable_failures():
 
 
 def test_thresholds_are_configurable():
-    relaxed = Thresholds(citation_validity=0.5, evidence_coverage=0.5, groundedness=0.5, required_fact_recall=0.5)
+    relaxed = Thresholds(citation_validity=0.5, evidence_coverage=0.5, retrieval_recall_at_k=0.5, groundedness=0.5, required_fact_recall=0.5)
     result = score_case(CASES[1], relaxed)
     assert result["passed"] is True
+
+
+def test_ranked_retrieval_metrics_measure_recall_and_first_hit():
+    case = {
+        **CASES[0],
+        "candidate": {
+            **CASES[0]["candidate"],
+            "retrieved_document_ids": ["DOC-NOISE", "DOC-RET-02"],
+        },
+    }
+    result = score_case(case, Thresholds(retrieval_recall_at_k=0.5))
+    assert result["metrics"]["retrieval_recall_at_k"] == 0.5
+    assert result["metrics"]["retrieval_mrr"] == 0.5

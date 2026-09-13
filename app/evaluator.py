@@ -15,6 +15,8 @@ STOP_WORDS = {"a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "i
 METRIC_NAMES = (
     "citation_validity",
     "evidence_coverage",
+    "retrieval_recall_at_k",
+    "retrieval_mrr",
     "groundedness",
     "required_fact_recall",
     "latency_ms",
@@ -30,6 +32,8 @@ def tokens(text: str) -> set[str]:
 class Thresholds:
     citation_validity: float = 1.0
     evidence_coverage: float = 0.8
+    retrieval_recall_at_k: float = 0.8
+    retrieval_mrr: float = 0.5
     groundedness: float = 0.7
     required_fact_recall: float = 0.8
     latency_ms: int = 1500
@@ -42,9 +46,20 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
     cited = set(case["candidate"]["citations"])
     valid_citations = cited & documents.keys()
     expected = set(case["expected_document_ids"])
+    # Preserve ranking for retrieval metrics. Older fixtures remain supported:
+    # citations are treated as the retrieved ranking when no explicit list exists.
+    retrieved = list(case["candidate"].get("retrieved_document_ids", case["candidate"]["citations"]))
 
     citation_validity = len(valid_citations) / len(cited) if cited else 0.0
     evidence_coverage = len(valid_citations & expected) / len(expected) if expected else 1.0
+    retrieval_recall_at_k = (
+        len(set(retrieved) & expected) / len(expected) if expected else 1.0
+    )
+    first_relevant_rank = next(
+        (rank for rank, document_id in enumerate(retrieved, start=1) if document_id in expected),
+        None,
+    )
+    retrieval_mrr = 1.0 / first_relevant_rank if first_relevant_rank else 0.0
 
     answer_tokens = tokens(case["candidate"]["answer"])
     context_tokens = tokens(" ".join(documents[document_id] for document_id in valid_citations))
@@ -59,6 +74,8 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
     metrics = {
         "citation_validity": round(citation_validity, 4),
         "evidence_coverage": round(evidence_coverage, 4),
+        "retrieval_recall_at_k": round(retrieval_recall_at_k, 4),
+        "retrieval_mrr": round(retrieval_mrr, 4),
         "groundedness": round(groundedness, 4),
         "required_fact_recall": round(required_fact_recall, 4),
         "latency_ms": latency_ms,
@@ -69,6 +86,8 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
         for name, passed in {
             "citation_validity": citation_validity >= limits.citation_validity,
             "evidence_coverage": evidence_coverage >= limits.evidence_coverage,
+            "retrieval_recall_at_k": retrieval_recall_at_k >= limits.retrieval_recall_at_k,
+            "retrieval_mrr": retrieval_mrr >= limits.retrieval_mrr,
             "groundedness": groundedness >= limits.groundedness,
             "required_fact_recall": required_fact_recall >= limits.required_fact_recall,
             "latency_ms": latency_ms <= limits.latency_ms,
