@@ -34,6 +34,8 @@ An AI application is not trustworthy because it produces fluent text. Teams need
 | Evidence coverage | Were expected supporting documents cited? |
 | Groundedness proxy | How much answer language is supported by context? |
 | Required-fact recall | Did the answer include the expected facts? |
+| Retrieval recall@k | Did the ranked retrieval set contain the expected evidence? |
+| Mean reciprocal rank (MRR) | How early did the first relevant document appear? |
 | Latency | Did the response meet the service target? |
 | Estimated cost | Is the model interaction within budget? |
 
@@ -82,14 +84,14 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - Deterministic and explainable scoring
 - Provider-neutral request/response contracts
 - Per-case latency and cost observability
-- Batch pass-rate, average metric, and failure-frequency reporting
+- Batch pass-rate, average metric, retrieval diagnostics, and failure-frequency reporting
 - Threshold decisions and human-review routing
 - Interactive Python/Streamlit dashboard and self-contained HTML/JSON evaluation report
 - Synthetic golden dataset and regression tests
 
 ## Limitations
 
-Lexical overlap is a transparent baseline, not semantic entailment. A production evaluation program would add model-based graders with calibration, adversarial datasets, bias and safety testing, retrieval diagnostics, prompt/model versioning, privacy controls, monitoring, and sampled expert review.
+Lexical overlap is a transparent baseline, not semantic entailment. Ranked recall@k and MRR now expose retrieval quality independently from answer quality. A production evaluation program would additionally use calibrated model-based graders, adversarial datasets, bias and safety testing, prompt/model versioning, privacy controls, monitoring, and sampled expert review.
 
 ## Target roles
 
