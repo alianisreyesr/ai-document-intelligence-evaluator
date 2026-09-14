@@ -1,7 +1,11 @@
 """Evaluation API and synthetic evidence dashboard."""
 
 import json
+import hashlib
+import threading
+from collections import deque
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -25,6 +29,7 @@ class Document(BaseModel):
 class Candidate(BaseModel):
     answer: str = Field(min_length=1)
     citations: list[str]
+    retrieved_document_ids: Optional[list[str]] = None
     latency_ms: int = Field(ge=0)
     cost_usd: float = Field(ge=0)
 
@@ -34,6 +39,8 @@ class ThresholdOverrides(BaseModel):
 
     citation_validity: Optional[float] = None
     evidence_coverage: Optional[float] = None
+    retrieval_recall_at_k: Optional[float] = None
+    retrieval_mrr: Optional[float] = None
     groundedness: Optional[float] = None
     required_fact_recall: Optional[float] = None
     latency_ms: Optional[int] = None
@@ -47,6 +54,20 @@ class EvaluationRequest(BaseModel):
     required_facts: list[str]
     candidate: Candidate
     thresholds: Optional[ThresholdOverrides] = None
+    provider: str = Field(default="unspecified", min_length=1, max_length=80)
+    model_version: str = Field(default="unspecified", min_length=1, max_length=120)
+    prompt_version: str = Field(default="unspecified", min_length=1, max_length=120)
+    retriever_version: str = Field(default="unspecified", min_length=1, max_length=120)
+
+
+_HISTORY_LIMIT = 500
+_history: deque[dict[str, Any]] = deque(maxlen=_HISTORY_LIMIT)
+_history_lock = threading.Lock()
+
+
+def _evaluation_id(payload: EvaluationRequest) -> str:
+    canonical = json.dumps(payload.model_dump(), sort_keys=True, separators=(",", ":"))
+    return "EVAL-" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12].upper()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -77,5 +98,44 @@ def evaluate(payload: EvaluationRequest) -> dict[str, Any]:
             if value is not None
         }
         limits = replace(limits, **overrides)
-    case = payload.model_dump(exclude={"thresholds"})
-    return score_case(case, limits)
+    case = payload.model_dump(
+        exclude={"thresholds", "provider", "model_version", "prompt_version", "retriever_version"}
+    )
+    result = score_case(case, limits)
+    record = {
+        "evaluation_id": _evaluation_id(payload),
+        "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "provider": payload.provider,
+        "model_version": payload.model_version,
+        "prompt_version": payload.prompt_version,
+        "retriever_version": payload.retriever_version,
+        **result,
+    }
+    with _history_lock:
+        _history.appendleft(record)
+    return record
+
+
+@app.get("/api/evaluations/history")
+def evaluation_history(limit: int = 50) -> dict[str, Any]:
+    safe_limit = min(max(limit, 1), 100)
+    with _history_lock:
+        records = list(_history)[:safe_limit]
+    return {"count": len(records), "records": records, "storage": "bounded-process-memory"}
+
+
+@app.get("/api/experiments/compare")
+def compare_experiments() -> dict[str, Any]:
+    with _history_lock:
+        records = list(_history)
+    groups: dict[str, dict[str, Any]] = {}
+    for record in records:
+        key = f"{record['provider']}::{record['model_version']}"
+        group = groups.setdefault(key, {"provider": record["provider"], "model_version": record["model_version"], "runs": 0, "passed": 0})
+        group["runs"] += 1
+        group["passed"] += int(record["passed"])
+    comparisons = [
+        {**group, "pass_rate": round(group["passed"] / group["runs"], 4)}
+        for group in groups.values()
+    ]
+    return {"count": len(comparisons), "models": sorted(comparisons, key=lambda item: (-item["pass_rate"], item["provider"], item["model_version"]))}
