@@ -79,3 +79,33 @@ def test_evaluation_threshold_override_is_partial():
     body = response.json()
     assert "latency_ms" not in body["failures"]  # overridden to 5000ms, 2000ms passes
     assert "citation_validity" in body["failures"]  # default 1.0 still enforced
+
+
+def test_api_preserves_ranked_retrieval_and_version_metadata():
+    payload = _evaluation_payload(
+        provider="open-source",
+        model_version="model-a-v1",
+        prompt_version="prompt-v2",
+        retriever_version="bm25-v1",
+        candidate={
+            "answer": "Returns are accepted within 30 days.",
+            "citations": ["DOC-1"],
+            "retrieved_document_ids": ["DOC-NOISE", "DOC-1"],
+            "latency_ms": 200,
+            "cost_usd": 0.001,
+        },
+    )
+    body = client.post("/api/evaluations", json=payload).json()
+    assert body["metrics"]["retrieval_mrr"] == 0.5
+    assert body["provider"] == "open-source"
+    assert body["evaluation_id"].startswith("EVAL-")
+
+
+def test_history_and_model_comparison_capture_runs():
+    client.post("/api/evaluations", json=_evaluation_payload(provider="provider-a", model_version="v1"))
+    history = client.get("/api/evaluations/history?limit=1").json()
+    assert history["count"] == 1
+    assert history["storage"] == "bounded-process-memory"
+
+    comparison = client.get("/api/experiments/compare").json()
+    assert any(model["provider"] == "provider-a" and model["runs"] >= 1 for model in comparison["models"])
