@@ -2,13 +2,16 @@
 
 import json
 import hashlib
+import csv
+import io
+from html import escape
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from app.evaluator import Thresholds, score_case
@@ -113,13 +116,59 @@ def evaluate(payload: EvaluationRequest) -> dict[str, Any]:
     return history.save(record)
 
 
-@app.get("/api/evaluations/history")
-def evaluation_history(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
-                       provider: str | None = None, model_version: str | None = None,
-                       prompt_version: str | None = None, retriever_version: str | None = None) -> dict[str, Any]:
+def filtered_history(provider: str | None = None, model_version: str | None = None,
+                     prompt_version: str | None = None, retriever_version: str | None = None,
+                     date_from: date | None = None, date_to: date | None = None):
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, "date_from must be on or before date_to")
     filters = dict(provider=provider, model_version=model_version, prompt_version=prompt_version, retriever_version=retriever_version)
     rows = [r for r in history.records() if all(value is None or r[key] == value for key, value in filters.items())]
+    return [r for r in rows if
+            (date_from is None or datetime.fromisoformat(r["evaluated_at"]).astimezone(timezone.utc).date() >= date_from)
+            and (date_to is None or datetime.fromisoformat(r["evaluated_at"]).astimezone(timezone.utc).date() <= date_to)]
+
+
+@app.get("/api/evaluations/history")
+def evaluation_history(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
+                       rows: list = Depends(filtered_history)) -> dict[str, Any]:
     return {"count": len(rows[offset:offset+limit]), "total": len(rows), "records": rows[offset:offset+limit], "storage": "sqlite"}
+
+
+@app.get("/api/evaluations/export")
+def export_history(rows: list = Depends(filtered_history)):
+    fields = ["run_id", "evaluated_at", "case_id", "provider", "model_version",
+              "prompt_version", "retriever_version", "passed"]
+    from app.evaluator import METRIC_NAMES
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(fields + list(METRIC_NAMES))
+    for row in rows:
+        values = [row[key] for key in fields] + [row["metrics"][key] for key in METRIC_NAMES]
+        # Spreadsheet applications interpret formula prefixes even in quoted CSV.
+        writer.writerow(["'" + value if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r", "\n")) else value for value in values])
+    return Response(output.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="evaluation-history.csv"'})
+
+
+@app.get("/history", response_class=HTMLResponse)
+def history_dashboard(rows: list = Depends(filtered_history)):
+    fields = ["evaluated_at", "case_id", "provider", "model_version", "prompt_version", "retriever_version", "passed"]
+    head = "".join("<th>" + escape(key.replace("_", " ").title()) + "</th>" for key in fields)
+    body = "".join("<tr>" + "".join("<td>" + escape(str(row[key])) + "</td>" for key in fields) + "</tr>" for row in rows[:100])
+    inputs = "".join('<label>' + name.replace("_", " ").title() + '<input name="' + name + '" type="' + ("date" if name.startswith("date_") else "text") + '"></label>'
+                     for name in ["provider", "model_version", "prompt_version", "retriever_version", "date_from", "date_to"])
+    return """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+    <title>Evaluation history</title><style>
+    body{font:16px system-ui;background:#f6f7fb;color:#172033;margin:0;padding:32px}
+    main{max-width:1200px;margin:auto}form{display:flex;flex-wrap:wrap;gap:12px}
+    label{display:grid;gap:6px}input,button{padding:10px;border:1px solid #bbb;border-radius:6px}
+    table{border-collapse:collapse;background:white;width:100%;margin-top:24px}td,th{padding:12px;text-align:left;border-bottom:1px solid #ddd}
+    .scroll{overflow:auto}a{color:#5530a0}</style><main>
+    <h1>Evaluation history</h1><p>Persistent run evidence · Dates are inclusive UTC calendar days.</p>
+    <a href="/">Golden-set dashboard</a><form method="get" onsubmit="for (const input of this.querySelectorAll('input')) { input.disabled = !input.value; }">""" + inputs + """
+    <button>Filter</button><button formaction="/api/evaluations/export">Export filtered CSV</button></form>
+    <p>Matching runs: """ + str(len(rows)) + """ · Showing the newest 100. JSON pagination is available through /api/evaluations/history.</p>
+    <div class="scroll"><table><thead><tr>""" + head + "</tr></thead><tbody>" + (body or '<tr><td colspan="7">No matching runs. Submit an evaluation to begin.</td></tr>') + "</tbody></table></div></main></html>"
 
 
 @app.get("/api/evaluations/runs/{run_id}")
