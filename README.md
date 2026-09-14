@@ -85,6 +85,8 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - Provider-neutral request/response contracts
 - Per-case latency and cost observability
 - Batch pass-rate, average metric, retrieval diagnostics, and failure-frequency reporting
+- Versioned provider/model/prompt/retriever metadata with deterministic evaluation IDs
+- Bounded session history and model pass-rate comparison endpoints for reproducible demos
 - Threshold decisions and human-review routing
 - Interactive Python/Streamlit dashboard and self-contained HTML/JSON evaluation report
 - Synthetic golden dataset and regression tests
