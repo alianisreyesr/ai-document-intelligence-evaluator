@@ -100,7 +100,11 @@ Each response includes a unique `run_id`, the existing deterministic
 Raw answers and source documents are not retained by the ledger.
 
 - `GET /api/evaluations/history`: pagination using limit/offset; exact filters
-  for provider, model_version, prompt_version, retriever_version.
+  for provider, model_version, prompt_version, retriever_version; inclusive UTC
+  dates using date_from/date_to (YYYY-MM-DD).
+- `GET /history`: filterable persistent-history dashboard, newest 100 matches.
+- `GET /api/evaluations/export`: CSV of all matching runs using the same filters,
+  with spreadsheet formula prefixes neutralized.
 - `GET /api/evaluations/runs/{run_id}`: individual JSON run.
 - `GET /api/experiments/regressions?baseline=RUN_ID&candidate=RUN_ID`:
   signed metric deltas and directional regressions on identical evidence and
@@ -109,8 +113,8 @@ Raw answers and source documents are not retained by the ledger.
 
 The public API is intended for synthetic local demos, not sensitive evaluation
 records. Authentication, retention policies, SQL-side filtering for large
-histories, CSV export, date filters, and a persistent-history dashboard remain
-follow-up work. The current dashboard still displays the synthetic golden set.
+histories remain follow-up work. The root dashboard displays the synthetic golden
+set; /history displays persisted API evaluations.
 - Threshold decisions and human-review routing
 - Interactive Python/Streamlit dashboard and self-contained HTML/JSON evaluation report
 - Synthetic golden dataset and regression tests
