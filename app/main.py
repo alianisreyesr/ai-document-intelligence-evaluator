@@ -2,18 +2,17 @@
 
 import json
 import hashlib
-import threading
-from collections import deque
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.evaluator import Thresholds, score_case
+from app import history
 from app.report import evaluate_batch, render_dashboard
 
 
@@ -60,9 +59,6 @@ class EvaluationRequest(BaseModel):
     retriever_version: str = Field(default="unspecified", min_length=1, max_length=120)
 
 
-_HISTORY_LIMIT = 500
-_history: deque[dict[str, Any]] = deque(maxlen=_HISTORY_LIMIT)
-_history_lock = threading.Lock()
 
 
 def _evaluation_id(payload: EvaluationRequest) -> str:
@@ -111,23 +107,45 @@ def evaluate(payload: EvaluationRequest) -> dict[str, Any]:
         "retriever_version": payload.retriever_version,
         **result,
     }
-    with _history_lock:
-        _history.appendleft(record)
-    return record
+    record["thresholds"] = limits.__dict__
+    evidence = {key: case[key] for key in ("case_id", "documents", "expected_document_ids", "required_facts")}
+    record["evidence_hash"] = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
+    return history.save(record)
 
 
 @app.get("/api/evaluations/history")
-def evaluation_history(limit: int = 50) -> dict[str, Any]:
-    safe_limit = min(max(limit, 1), 100)
-    with _history_lock:
-        records = list(_history)[:safe_limit]
-    return {"count": len(records), "records": records, "storage": "bounded-process-memory"}
+def evaluation_history(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
+                       provider: str | None = None, model_version: str | None = None,
+                       prompt_version: str | None = None, retriever_version: str | None = None) -> dict[str, Any]:
+    filters = dict(provider=provider, model_version=model_version, prompt_version=prompt_version, retriever_version=retriever_version)
+    rows = [r for r in history.records() if all(value is None or r[key] == value for key, value in filters.items())]
+    return {"count": len(rows[offset:offset+limit]), "total": len(rows), "records": rows[offset:offset+limit], "storage": "sqlite"}
+
+
+@app.get("/api/evaluations/runs/{run_id}")
+def evaluation_run(run_id: str):
+    record = history.get(run_id)
+    if record is None:
+        raise HTTPException(404, "Run not found")
+    return record
+
+
+@app.get("/api/experiments/regressions")
+def regressions(baseline: str, candidate: str):
+    before, after = history.get(baseline), history.get(candidate)
+    if before is None or after is None:
+        raise HTTPException(404, "Run not found")
+    if before["evidence_hash"] != after["evidence_hash"] or before["thresholds"] != after["thresholds"]:
+        raise HTTPException(422, "Comparison requires identical evidence and thresholds")
+    deltas = {key: round(after["metrics"][key] - value, 6) for key, value in before["metrics"].items()}
+    worse = [key for key, delta in deltas.items() if (delta > 0 if key in ("cost_usd", "latency_ms") else delta < 0)]
+    return {"baseline": baseline, "candidate": candidate, "deltas": deltas, "regressions": worse,
+            "has_regression": bool(worse), "boundary": "Pairwise observed changes, not statistical significance"}
 
 
 @app.get("/api/experiments/compare")
 def compare_experiments() -> dict[str, Any]:
-    with _history_lock:
-        records = list(_history)
+    records = history.records()
     groups: dict[str, dict[str, Any]] = {}
     for record in records:
         key = f"{record['provider']}::{record['model_version']}"
