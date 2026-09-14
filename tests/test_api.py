@@ -105,7 +105,7 @@ def test_history_and_model_comparison_capture_runs():
     client.post("/api/evaluations", json=_evaluation_payload(provider="provider-a", model_version="v1"))
     history = client.get("/api/evaluations/history?limit=1").json()
     assert history["count"] == 1
-    assert history["storage"] == "bounded-process-memory"
+    assert history["storage"] == "sqlite"
 
     comparison = client.get("/api/experiments/compare").json()
     assert any(model["provider"] == "provider-a" and model["runs"] >= 1 for model in comparison["models"])

@@ -86,7 +86,35 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - Per-case latency and cost observability
 - Batch pass-rate, average metric, retrieval diagnostics, and failure-frequency reporting
 - Versioned provider/model/prompt/retriever metadata with deterministic evaluation IDs
-- Bounded session history and model pass-rate comparison endpoints for reproducible demos
+- SQLite run history and model pass-rate comparison endpoints for reproducible demos
+
+### Persistent run ledger
+
+Set `EVALUATION_DB_PATH` (default `data/evaluations.db`) to a persistent, writable
+location. Container deployments need a persistent volume at that location.
+The additive version-1 schema is initialized idempotently on first access.
+Existing in-memory history cannot be recovered after a restart.
+
+Each response includes a unique `run_id`, the existing deterministic
+`evaluation_id`, effective thresholds, and an evidence fingerprint.
+Raw answers and source documents are not retained by the ledger.
+
+- `GET /api/evaluations/history`: pagination using limit/offset; exact filters
+  for provider, model_version, prompt_version, retriever_version; inclusive UTC
+  dates using date_from/date_to (YYYY-MM-DD).
+- `GET /history`: filterable persistent-history dashboard, newest 100 matches.
+- `GET /api/evaluations/export`: CSV of all matching runs using the same filters,
+  with spreadsheet formula prefixes neutralized.
+- `GET /api/evaluations/runs/{run_id}`: individual JSON run.
+- `GET /api/experiments/regressions?baseline=RUN_ID&candidate=RUN_ID`:
+  signed metric deltas and directional regressions on identical evidence and
+  thresholds. Higher cost/latency and lower quality scores count as regressions.
+  This is an observed pairwise comparison, not a statistical significance test.
+
+The public API is intended for synthetic local demos, not sensitive evaluation
+records. Authentication, retention policies, SQL-side filtering for large
+histories remain follow-up work. The root dashboard displays the synthetic golden
+set; /history displays persisted API evaluations.
 - Threshold decisions and human-review routing
 - Interactive Python/Streamlit dashboard and self-contained HTML/JSON evaluation report
 - Synthetic golden dataset and regression tests
