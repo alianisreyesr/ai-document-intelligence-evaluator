@@ -48,7 +48,10 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
     expected = set(case["expected_document_ids"])
     # Preserve ranking for retrieval metrics. Older fixtures remain supported:
     # citations are treated as the retrieved ranking when no explicit list exists.
-    retrieved = list(case["candidate"].get("retrieved_document_ids", case["candidate"]["citations"]))
+    retrieved = list(
+        case["candidate"].get("retrieved_document_ids")
+        or case["candidate"]["citations"]
+    )
 
     citation_validity = len(valid_citations) / len(cited) if cited else 0.0
     evidence_coverage = len(valid_citations & expected) / len(expected) if expected else 1.0
