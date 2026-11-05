@@ -9,27 +9,42 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.evaluator import Thresholds, score_case
 from app.report import evaluate_batch, render_dashboard
 
 
-app = FastAPI(title="AI Document Intelligence Evaluator", version="0.1.0")
+app = FastAPI(title="AI Document Intelligence Evaluator", version="1.1.0")
 DEMO_CASES = json.loads((Path(__file__).parents[1] / "data" / "evaluation_cases.json").read_text(encoding="utf-8"))
 
 
+# Input size limits (DoS guard). Bodies above MAX_BODY_BYTES get HTTP 413.
+MAX_BODY_BYTES = 1_000_000
+MAX_ITEMS = 100
+MAX_ID_LENGTH = 200
+MAX_TEXT_LENGTH = 50_000
+
+
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+        return JSONResponse({"detail": "Request body too large."}, status_code=413)
+    return await call_next(request)
+
+
 class Document(BaseModel):
-    id: str
-    text: str = Field(min_length=1)
+    id: str = Field(max_length=MAX_ID_LENGTH)
+    text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
 
 
 class Candidate(BaseModel):
-    answer: str = Field(min_length=1)
-    citations: list[str]
-    retrieved_document_ids: Optional[list[str]] = None
+    answer: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
+    citations: list[str] = Field(max_length=MAX_ITEMS)
+    retrieved_document_ids: Optional[list[str]] = Field(default=None, max_length=MAX_ITEMS)
     latency_ms: int = Field(ge=0)
     cost_usd: float = Field(ge=0)
 
@@ -37,21 +52,21 @@ class Candidate(BaseModel):
 class ThresholdOverrides(BaseModel):
     """Per-field overrides for Thresholds; unset fields keep the default."""
 
-    citation_validity: Optional[float] = None
-    evidence_coverage: Optional[float] = None
-    retrieval_recall_at_k: Optional[float] = None
-    retrieval_mrr: Optional[float] = None
-    groundedness: Optional[float] = None
-    required_fact_recall: Optional[float] = None
-    latency_ms: Optional[int] = None
-    cost_usd: Optional[float] = None
+    citation_validity: Optional[float] = Field(default=None, ge=0, le=1)
+    evidence_coverage: Optional[float] = Field(default=None, ge=0, le=1)
+    retrieval_recall_at_k: Optional[float] = Field(default=None, ge=0, le=1)
+    retrieval_mrr: Optional[float] = Field(default=None, ge=0, le=1)
+    groundedness: Optional[float] = Field(default=None, ge=0, le=1)
+    required_fact_recall: Optional[float] = Field(default=None, ge=0, le=1)
+    latency_ms: Optional[int] = Field(default=None, ge=0)
+    cost_usd: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class EvaluationRequest(BaseModel):
-    case_id: str
-    documents: list[Document]
-    expected_document_ids: list[str]
-    required_facts: list[str]
+    case_id: str = Field(max_length=MAX_ID_LENGTH)
+    documents: list[Document] = Field(max_length=MAX_ITEMS)
+    expected_document_ids: list[str] = Field(max_length=MAX_ITEMS)
+    required_facts: list[str] = Field(max_length=MAX_ITEMS)
     candidate: Candidate
     thresholds: Optional[ThresholdOverrides] = None
     provider: str = Field(default="unspecified", min_length=1, max_length=80)

@@ -15,10 +15,11 @@ def evaluate_batch(cases: list[dict]) -> dict[str, object]:
     failures = Counter(failure for result in results for failure in result["failures"])
     total = len(results)
     passed = sum(result["passed"] for result in results)
-    averages = {
-        metric: round(sum(float(result["metrics"][metric]) for result in results) / total, 4) if total else 0
-        for metric in METRIC_NAMES
-    }
+    averages: dict[str, float | None] = {}
+    for metric in METRIC_NAMES:
+        # Cases where a metric is N/A (None) are excluded from its average.
+        values = [float(r["metrics"][metric]) for r in results if r["metrics"][metric] is not None]
+        averages[metric] = round(sum(values) / len(values), 4) if values else (None if total else 0)
     return {
         "summary": {"total": total, "passed": passed, "failed": total - passed, "pass_rate": round(passed / total, 4) if total else 0},
         "averages": averages,
@@ -27,11 +28,15 @@ def evaluate_batch(cases: list[dict]) -> dict[str, object]:
     }
 
 
+def _fmt(value: object) -> str:
+    return "N/A" if value is None else f"{float(value):.2f}"
+
+
 def render_dashboard(report: dict[str, object]) -> str:
     summary = report["summary"]
     averages = report["averages"]
     result_rows = "".join(
-        f"<tr><td>{result['case_id']}</td><td><span class='status {'pass' if result['passed'] else 'fail'}'>{'Pass' if result['passed'] else 'Review'}</span></td><td>{result['metrics']['citation_validity']:.2f}</td><td>{result['metrics']['retrieval_recall_at_k']:.2f}</td><td>{result['metrics']['retrieval_mrr']:.2f}</td><td>{result['metrics']['groundedness']:.2f}</td><td>{result['metrics']['required_fact_recall']:.2f}</td><td>{result['metrics']['latency_ms']} ms</td><td>${result['metrics']['cost_usd']:.4f}</td></tr>"
+        f"<tr><td>{result['case_id']}</td><td><span class='status {'pass' if result['passed'] else 'fail'}'>{'Pass' if result['passed'] else 'Review'}</span></td><td>{result['metrics']['citation_validity']:.2f}</td><td>{_fmt(result['metrics']['retrieval_recall_at_k'])}</td><td>{result['metrics']['retrieval_mrr']:.2f}</td><td>{result['metrics']['groundedness']:.2f}</td><td>{_fmt(result['metrics']['required_fact_recall'])}</td><td>{result['metrics']['latency_ms']} ms</td><td>${result['metrics']['cost_usd']:.4f}</td></tr>"
         for result in report["results"]
     )
     failure_rows = "".join(

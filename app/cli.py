@@ -9,6 +9,10 @@ from pathlib import Path
 from app.evaluator import score_case
 
 
+def _fmt(value: float | None) -> str:
+    return "N/A" if value is None else f"{value:.2f}"
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/evaluation_cases.json")
     cases = json.loads(path.read_text(encoding="utf-8"))
@@ -18,8 +22,8 @@ def main() -> None:
         print(
             f"{result['case_id']} {'PASS' if result['passed'] else 'FAIL'} "
             f"citation_validity={metrics['citation_validity']:.2f} "
-            f"coverage={metrics['evidence_coverage']:.2f} groundedness={metrics['groundedness']:.2f} "
-            f"facts={metrics['required_fact_recall']:.2f} latency_ms={metrics['latency_ms']} "
+            f"coverage={_fmt(metrics['evidence_coverage'])} groundedness={metrics['groundedness']:.2f} "
+            f"facts={_fmt(metrics['required_fact_recall'])} latency_ms={metrics['latency_ms']} "
             f"cost_usd={metrics['cost_usd']:.4f}"
         )
 

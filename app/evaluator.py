@@ -24,6 +24,10 @@ METRIC_NAMES = (
 )
 
 
+def _round(value: float | None) -> float | None:
+    return None if value is None else round(value, 4)
+
+
 def tokens(text: str) -> set[str]:
     return {token for token in TOKEN_PATTERN.findall(text.lower()) if token not in STOP_WORDS and len(token) > 1}
 
@@ -41,6 +45,13 @@ class Thresholds:
 
 
 def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, object]:
+    """Score one case.
+
+    Metrics that are undefined for the case (no expected documents for
+    evidence_coverage / retrieval_recall_at_k, no required facts for
+    required_fact_recall) are reported as ``None`` ("N/A") instead of a
+    vacuous 1.0, and are not counted as threshold failures.
+    """
     limits = thresholds or Thresholds()
     documents = {document["id"]: document["text"] for document in case["documents"]}
     cited = set(case["candidate"]["citations"])
@@ -54,9 +65,9 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
     )
 
     citation_validity = len(valid_citations) / len(cited) if cited else 0.0
-    evidence_coverage = len(valid_citations & expected) / len(expected) if expected else 1.0
+    evidence_coverage = len(valid_citations & expected) / len(expected) if expected else None
     retrieval_recall_at_k = (
-        len(set(retrieved) & expected) / len(expected) if expected else 1.0
+        len(set(retrieved) & expected) / len(expected) if expected else None
     )
     first_relevant_rank = next(
         (rank for rank, document_id in enumerate(retrieved, start=1) if document_id in expected),
@@ -70,17 +81,17 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
 
     answer_lower = case["candidate"]["answer"].lower()
     required_facts = case["required_facts"]
-    required_fact_recall = sum(fact.lower() in answer_lower for fact in required_facts) / len(required_facts) if required_facts else 1.0
+    required_fact_recall = sum(fact.lower() in answer_lower for fact in required_facts) / len(required_facts) if required_facts else None
 
     latency_ms = int(case["candidate"]["latency_ms"])
     cost_usd = float(case["candidate"]["cost_usd"])
     metrics = {
         "citation_validity": round(citation_validity, 4),
-        "evidence_coverage": round(evidence_coverage, 4),
-        "retrieval_recall_at_k": round(retrieval_recall_at_k, 4),
+        "evidence_coverage": _round(evidence_coverage),
+        "retrieval_recall_at_k": _round(retrieval_recall_at_k),
         "retrieval_mrr": round(retrieval_mrr, 4),
         "groundedness": round(groundedness, 4),
-        "required_fact_recall": round(required_fact_recall, 4),
+        "required_fact_recall": _round(required_fact_recall),
         "latency_ms": latency_ms,
         "cost_usd": cost_usd,
     }
@@ -88,11 +99,11 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
         name
         for name, passed in {
             "citation_validity": citation_validity >= limits.citation_validity,
-            "evidence_coverage": evidence_coverage >= limits.evidence_coverage,
-            "retrieval_recall_at_k": retrieval_recall_at_k >= limits.retrieval_recall_at_k,
+            "evidence_coverage": evidence_coverage is None or evidence_coverage >= limits.evidence_coverage,
+            "retrieval_recall_at_k": retrieval_recall_at_k is None or retrieval_recall_at_k >= limits.retrieval_recall_at_k,
             "retrieval_mrr": retrieval_mrr >= limits.retrieval_mrr,
             "groundedness": groundedness >= limits.groundedness,
-            "required_fact_recall": required_fact_recall >= limits.required_fact_recall,
+            "required_fact_recall": required_fact_recall is None or required_fact_recall >= limits.required_fact_recall,
             "latency_ms": latency_ms <= limits.latency_ms,
             "cost_usd": cost_usd <= limits.cost_usd,
         }.items()

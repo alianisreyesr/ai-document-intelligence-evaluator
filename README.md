@@ -57,7 +57,7 @@ flowchart LR
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt   # runtime deps live in requirements.txt
 python -m app.cli data/evaluation_cases.json
 python -m app.report --input data/evaluation_cases.json --output reports/evaluation-dashboard.html
 streamlit run dashboard.py
@@ -77,6 +77,10 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - `GET /health` — runtime and AI boundary
 - `POST /api/evaluations` — evaluate a candidate answer and evidence
 - `GET /api/thresholds` — transparent acceptance thresholds
+- `GET /api/evaluations/history?limit=50` — most recent evaluation records (newest first, `limit` clamped to 1-100), including provider/model/prompt/retriever versions. Stored in bounded process memory (last 500); it is lost on restart and is per worker.
+- `GET /api/experiments/compare` — evaluation runs grouped by `provider::model_version` with run count, passes and pass rate, best first
+
+`POST /api/evaluations` also accepts optional `thresholds` overrides (ratios must be within 0-1, `latency_ms` and `cost_usd` non-negative) and `provider`, `model_version`, `prompt_version`, `retriever_version` metadata. Input is bounded: at most 100 items per list, 50,000 characters per text and a 1 MB request body (HTTP 413 above that). Metrics that are undefined for a case (no expected documents or no required facts) are returned as `null` (N/A) and do not count as failures.
 
 ## What it demonstrates
 

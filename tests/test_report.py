@@ -20,3 +20,13 @@ def test_report_exports_html_and_json(tmp_path: Path):
     assert report["summary"]["total"] == 2
     assert "AI Quality Dashboard" in output.read_text()
     assert output.with_suffix(".json").exists()
+
+
+def test_batch_report_handles_na_metrics():
+    from app.report import evaluate_batch, render_dashboard
+    from tests.test_evaluator import CASES
+
+    case = {**CASES[0], "expected_document_ids": [], "required_facts": []}
+    report = evaluate_batch([case])
+    assert report["averages"]["evidence_coverage"] is None
+    assert "N/A" in render_dashboard(report)

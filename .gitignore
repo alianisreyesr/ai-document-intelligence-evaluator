@@ -5,3 +5,7 @@ __pycache__/
 reports/*.html
 reports/*.json
 .DS_Store
+.coverage
+coverage.xml
+.mypy_cache/
+.ruff_cache/

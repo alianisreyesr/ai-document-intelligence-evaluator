@@ -44,3 +44,15 @@ def test_ranked_retrieval_metrics_measure_recall_and_first_hit():
     result = score_case(case, Thresholds(retrieval_recall_at_k=0.5))
     assert result["metrics"]["retrieval_recall_at_k"] == 0.5
     assert result["metrics"]["retrieval_mrr"] == 0.5
+
+
+def test_undefined_metrics_are_none_and_not_failures():
+    case = {
+        **CASES[0],
+        "expected_document_ids": [],
+        "required_facts": [],
+    }
+    result = score_case(case)
+    for name in ("evidence_coverage", "retrieval_recall_at_k", "required_fact_recall"):
+        assert result["metrics"][name] is None
+        assert name not in result["failures"]
