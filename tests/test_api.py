@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
 client = TestClient(app)
 
 
@@ -151,3 +150,36 @@ def test_empty_expected_lists_report_na_not_perfect_scores():
     assert metrics["evidence_coverage"] is None
     assert metrics["retrieval_recall_at_k"] is None
     assert metrics["required_fact_recall"] is None
+
+
+def test_duplicate_document_ids_are_rejected_with_422():
+    payload = _evaluation_payload(
+        documents=[
+            {"id": "DOC-1", "text": "Returns are accepted within 30 days."},
+            {"id": "DOC-1", "text": "A conflicting duplicate."},
+        ]
+    )
+    response = client.post("/api/evaluations", json=payload)
+    assert response.status_code == 422
+    assert "Duplicate document ids" in response.text
+
+
+def test_api_recall_at_k_truncates_ranking():
+    payload = _evaluation_payload(
+        k=1,
+        candidate={
+            "answer": "Returns are accepted within 30 days.",
+            "citations": ["DOC-1"],
+            "retrieved_document_ids": ["DOC-NOISE", "DOC-1"],
+            "latency_ms": 200,
+            "cost_usd": 0.001,
+        },
+    )
+    body = client.post("/api/evaluations", json=payload).json()
+    assert body["metrics"]["retrieval_recall_at_k"] == 0.0
+    assert body["metrics"]["retrieval_mrr"] == 0.5
+
+
+def test_api_rejects_invalid_k():
+    for k in (0, -1, 101):
+        assert client.post("/api/evaluations", json=_evaluation_payload(k=k)).status_code == 422

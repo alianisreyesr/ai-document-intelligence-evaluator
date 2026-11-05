@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-
+from typing import Any
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 STOP_WORDS = {"a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "is", "it", "of", "on", "or", "that", "the", "to", "was", "with"}
@@ -44,8 +44,12 @@ class Thresholds:
     cost_usd: float = 0.01
 
 
-def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, object]:
+def score_case(case: dict[str, Any], thresholds: Thresholds | None = None, k: int | None = None) -> dict[str, Any]:
     """Score one case.
+
+    ``k`` (or ``case["k"]``) is the retrieval cut-off: ``retrieval_recall_at_k``
+    only considers the first ``k`` entries of the ranking. Without it the whole
+    ranking is used. Duplicate document ids raise ``ValueError``.
 
     Metrics that are undefined for the case (no expected documents for
     evidence_coverage / retrieval_recall_at_k, no required facts for
@@ -53,7 +57,14 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
     vacuous 1.0, and are not counted as threshold failures.
     """
     limits = thresholds or Thresholds()
+    document_ids = [document["id"] for document in case["documents"]]
+    duplicates = sorted({document_id for document_id in document_ids if document_ids.count(document_id) > 1})
+    if duplicates:
+        raise ValueError(f"Duplicate document ids: {', '.join(duplicates)}")
     documents = {document["id"]: document["text"] for document in case["documents"]}
+    cutoff = k if k is not None else case.get("k")
+    if cutoff is not None and (isinstance(cutoff, bool) or not isinstance(cutoff, int) or cutoff < 1):
+        raise ValueError("k must be a positive integer")
     cited = set(case["candidate"]["citations"])
     valid_citations = cited & documents.keys()
     expected = set(case["expected_document_ids"])
@@ -66,8 +77,9 @@ def score_case(case: dict, thresholds: Thresholds | None = None) -> dict[str, ob
 
     citation_validity = len(valid_citations) / len(cited) if cited else 0.0
     evidence_coverage = len(valid_citations & expected) / len(expected) if expected else None
+    ranked_at_k = retrieved[:cutoff] if cutoff is not None else retrieved
     retrieval_recall_at_k = (
-        len(set(retrieved) & expected) / len(expected) if expected else None
+        len(set(ranked_at_k) & expected) / len(expected) if expected else None
     )
     first_relevant_rank = next(
         (rank for rank, document_id in enumerate(retrieved, start=1) if document_id in expected),

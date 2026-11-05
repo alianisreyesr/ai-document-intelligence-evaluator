@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from app.evaluator import METRIC_NAMES, score_case
 
 
-def evaluate_batch(cases: list[dict]) -> dict[str, object]:
+def evaluate_batch(cases: list[dict[str, Any]]) -> dict[str, Any]:
     results = [score_case(case) for case in cases]
     failures = Counter(failure for result in results for failure in result["failures"])
     total = len(results)
@@ -28,19 +30,19 @@ def evaluate_batch(cases: list[dict]) -> dict[str, object]:
     }
 
 
-def _fmt(value: object) -> str:
+def _fmt(value: Any) -> str:
     return "N/A" if value is None else f"{float(value):.2f}"
 
 
-def render_dashboard(report: dict[str, object]) -> str:
+def render_dashboard(report: dict[str, Any]) -> str:
     summary = report["summary"]
     averages = report["averages"]
     result_rows = "".join(
-        f"<tr><td>{result['case_id']}</td><td><span class='status {'pass' if result['passed'] else 'fail'}'>{'Pass' if result['passed'] else 'Review'}</span></td><td>{result['metrics']['citation_validity']:.2f}</td><td>{_fmt(result['metrics']['retrieval_recall_at_k'])}</td><td>{result['metrics']['retrieval_mrr']:.2f}</td><td>{result['metrics']['groundedness']:.2f}</td><td>{_fmt(result['metrics']['required_fact_recall'])}</td><td>{result['metrics']['latency_ms']} ms</td><td>${result['metrics']['cost_usd']:.4f}</td></tr>"
+        f"<tr><td>{html.escape(str(result['case_id']))}</td><td><span class='status {'pass' if result['passed'] else 'fail'}'>{'Pass' if result['passed'] else 'Review'}</span></td><td>{result['metrics']['citation_validity']:.2f}</td><td>{_fmt(result['metrics']['retrieval_recall_at_k'])}</td><td>{result['metrics']['retrieval_mrr']:.2f}</td><td>{result['metrics']['groundedness']:.2f}</td><td>{_fmt(result['metrics']['required_fact_recall'])}</td><td>{result['metrics']['latency_ms']} ms</td><td>${result['metrics']['cost_usd']:.4f}</td></tr>"
         for result in report["results"]
     )
     failure_rows = "".join(
-        f"<li><span>{name.replace('_', ' ').title()}</span><strong>{count}</strong></li>" for name, count in report["failure_counts"].items()
+        f"<li><span>{html.escape(name.replace('_', ' ').title())}</span><strong>{count}</strong></li>" for name, count in report["failure_counts"].items()
     ) or "<li><span>No threshold failures</span><strong>0</strong></li>"
     return f"""<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>AI Evaluation Dashboard</title><style>
@@ -56,7 +58,7 @@ h1{{font-size:38px;margin:8px 0}}.sub{{color:var(--muted);max-width:800px}}.metr
 <footer>Synthetic evaluation cases · deterministic baseline metrics · human review remains required</footer></main></body></html>"""
 
 
-def export_report(input_path: Path, output_path: Path) -> dict[str, object]:
+def export_report(input_path: Path, output_path: Path) -> dict[str, Any]:
     cases = json.loads(input_path.read_text(encoding="utf-8"))
     report = evaluate_batch(cases)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,11 +67,11 @@ def export_report(input_path: Path, output_path: Path) -> dict[str, object]:
     return report
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=Path("data/evaluation_cases.json"))
     parser.add_argument("--output", type=Path, default=Path("reports/evaluation-dashboard.html"))
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     report = export_report(args.input, args.output)
     print(f"dashboard={args.output} total={report['summary']['total']} pass_rate={report['summary']['pass_rate']:.0%}")
 

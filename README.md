@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/ci.yml/badge.svg)](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/codeql.yml/badge.svg)](https://github.com/alianisreyesr/ai-document-intelligence-evaluator/actions/workflows/codeql.yml)
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11_|_3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-evaluation_API-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-dashboard-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
 ![AI](https://img.shields.io/badge/Applied_AI-evaluation-6F42C1?style=flat-square)
@@ -62,6 +62,7 @@ python -m app.cli data/evaluation_cases.json
 python -m app.report --input data/evaluation_cases.json --output reports/evaluation-dashboard.html
 streamlit run dashboard.py
 python -m pytest
+ruff check . && mypy
 uvicorn app.main:app --reload
 ```
 
@@ -80,7 +81,7 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 - `GET /api/evaluations/history?limit=50` — most recent evaluation records (newest first, `limit` clamped to 1-100), including provider/model/prompt/retriever versions. Stored in bounded process memory (last 500); it is lost on restart and is per worker.
 - `GET /api/experiments/compare` — evaluation runs grouped by `provider::model_version` with run count, passes and pass rate, best first
 
-`POST /api/evaluations` also accepts optional `thresholds` overrides (ratios must be within 0-1, `latency_ms` and `cost_usd` non-negative) and `provider`, `model_version`, `prompt_version`, `retriever_version` metadata. Input is bounded: at most 100 items per list, 50,000 characters per text and a 1 MB request body (HTTP 413 above that). Metrics that are undefined for a case (no expected documents or no required facts) are returned as `null` (N/A) and do not count as failures.
+`POST /api/evaluations` also accepts optional `thresholds` overrides (ratios must be within 0-1, `latency_ms` and `cost_usd` non-negative) and `provider`, `model_version`, `prompt_version`, `retriever_version` metadata. Input is bounded: at most 100 items per list, 50,000 characters per text and a 1 MB request body (HTTP 413 above that). Metrics that are undefined for a case (no expected documents or no required facts) are returned as `null` (N/A) and do not count as failures. `k` (optional, 1-100) sets the recall@k cut-off over `candidate.retrieved_document_ids`; without it the whole ranking is used. Duplicate document ids are rejected with HTTP 422.
 
 ## What it demonstrates
 

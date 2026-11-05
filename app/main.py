@@ -1,21 +1,20 @@
 """Evaluation API and synthetic evidence dashboard."""
 
-import json
 import hashlib
+import json
 import threading
 from collections import deque
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.evaluator import Thresholds, score_case
 from app.report import evaluate_batch, render_dashboard
-
 
 app = FastAPI(title="AI Document Intelligence Evaluator", version="1.1.0")
 DEMO_CASES = json.loads((Path(__file__).parents[1] / "data" / "evaluation_cases.json").read_text(encoding="utf-8"))
@@ -44,7 +43,7 @@ class Document(BaseModel):
 class Candidate(BaseModel):
     answer: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     citations: list[str] = Field(max_length=MAX_ITEMS)
-    retrieved_document_ids: Optional[list[str]] = Field(default=None, max_length=MAX_ITEMS)
+    retrieved_document_ids: list[str] | None = Field(default=None, max_length=MAX_ITEMS)
     latency_ms: int = Field(ge=0)
     cost_usd: float = Field(ge=0)
 
@@ -52,14 +51,14 @@ class Candidate(BaseModel):
 class ThresholdOverrides(BaseModel):
     """Per-field overrides for Thresholds; unset fields keep the default."""
 
-    citation_validity: Optional[float] = Field(default=None, ge=0, le=1)
-    evidence_coverage: Optional[float] = Field(default=None, ge=0, le=1)
-    retrieval_recall_at_k: Optional[float] = Field(default=None, ge=0, le=1)
-    retrieval_mrr: Optional[float] = Field(default=None, ge=0, le=1)
-    groundedness: Optional[float] = Field(default=None, ge=0, le=1)
-    required_fact_recall: Optional[float] = Field(default=None, ge=0, le=1)
-    latency_ms: Optional[int] = Field(default=None, ge=0)
-    cost_usd: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    citation_validity: float | None = Field(default=None, ge=0, le=1)
+    evidence_coverage: float | None = Field(default=None, ge=0, le=1)
+    retrieval_recall_at_k: float | None = Field(default=None, ge=0, le=1)
+    retrieval_mrr: float | None = Field(default=None, ge=0, le=1)
+    groundedness: float | None = Field(default=None, ge=0, le=1)
+    required_fact_recall: float | None = Field(default=None, ge=0, le=1)
+    latency_ms: int | None = Field(default=None, ge=0)
+    cost_usd: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class EvaluationRequest(BaseModel):
@@ -68,11 +67,20 @@ class EvaluationRequest(BaseModel):
     expected_document_ids: list[str] = Field(max_length=MAX_ITEMS)
     required_facts: list[str] = Field(max_length=MAX_ITEMS)
     candidate: Candidate
-    thresholds: Optional[ThresholdOverrides] = None
+    thresholds: ThresholdOverrides | None = None
     provider: str = Field(default="unspecified", min_length=1, max_length=80)
     model_version: str = Field(default="unspecified", min_length=1, max_length=120)
     prompt_version: str = Field(default="unspecified", min_length=1, max_length=120)
     retriever_version: str = Field(default="unspecified", min_length=1, max_length=120)
+    k: int | None = Field(default=None, ge=1, le=MAX_ITEMS, description="Retrieval cut-off for recall@k")
+
+    @model_validator(mode="after")
+    def _reject_duplicate_document_ids(self) -> "EvaluationRequest":
+        ids = [document.id for document in self.documents]
+        duplicates = sorted({document_id for document_id in ids if ids.count(document_id) > 1})
+        if duplicates:
+            raise ValueError(f"Duplicate document ids: {', '.join(duplicates)}")
+        return self
 
 
 _HISTORY_LIMIT = 500
@@ -114,12 +122,12 @@ def evaluate(payload: EvaluationRequest) -> dict[str, Any]:
         }
         limits = replace(limits, **overrides)
     case = payload.model_dump(
-        exclude={"thresholds", "provider", "model_version", "prompt_version", "retriever_version"}
+        exclude={"thresholds", "provider", "model_version", "prompt_version", "retriever_version", "k"}
     )
-    result = score_case(case, limits)
+    result = score_case(case, limits, k=payload.k)
     record = {
         "evaluation_id": _evaluation_id(payload),
-        "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "evaluated_at": datetime.now(UTC).isoformat(),
         "provider": payload.provider,
         "model_version": payload.model_version,
         "prompt_version": payload.prompt_version,

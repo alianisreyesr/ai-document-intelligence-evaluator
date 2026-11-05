@@ -4,6 +4,21 @@ All notable changes to this portfolio project are documented in this file.
 
 The project follows semantic versioning for public portfolio releases. Version numbers describe the repository's software baseline; they do not indicate regulatory or production certification of the evaluation methodology.
 
+## [Unreleased]
+
+### Added
+
+- Optional `k` cut-off for `retrieval_recall_at_k` (API field, case field or `score_case(k=...)`)
+- Tests for `app/cli.py` (previously 0% covered), HTML escaping and the new validation
+- `ruff` and `mypy` configuration; CI now runs both, tests on Python 3.11 and 3.12 and enforces a 90% coverage threshold
+
+### Changed
+
+- Duplicate document ids now fail with HTTP 422 (API) or exit code 2 (CLI) instead of silently overwriting each other
+- `python -m app.cli` reports unreadable or malformed input as an error message instead of a traceback
+- `render_dashboard` HTML-escapes case ids and failure names
+- Fixed all ruff findings; CI workflow declares minimal `contents: read` permissions; `.gitignore` covers coverage and tooling artifacts
+
 ## [1.1.0] — 2026-11-05
 
 ### Added

@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from app.report import evaluate_batch, export_report
-
+from app.report import evaluate_batch, export_report, render_dashboard
+from app.report import main as report_main
 
 DATA = Path(__file__).parents[1] / "data" / "evaluation_cases.json"
 
@@ -30,3 +30,19 @@ def test_batch_report_handles_na_metrics():
     report = evaluate_batch([case])
     assert report["averages"]["evidence_coverage"] is None
     assert "N/A" in render_dashboard(report)
+
+
+def test_render_dashboard_escapes_html_in_case_ids():
+    from tests.test_evaluator import CASES
+
+    case = {**CASES[0], "case_id": "<script>alert(1)</script>&"}
+    html_output = render_dashboard(evaluate_batch([case]))
+    assert "<script>alert(1)</script>" not in html_output
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;&amp;" in html_output
+
+
+def test_report_main_writes_outputs(tmp_path: Path, capsys):
+    output = tmp_path / "out" / "dashboard.html"
+    report_main(["--input", str(DATA), "--output", str(output)])
+    assert output.exists()
+    assert "total=2 pass_rate=50%" in capsys.readouterr().out

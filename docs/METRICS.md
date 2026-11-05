@@ -4,7 +4,7 @@
 - **Evidence coverage:** expected documents cited / expected documents.
 - **Groundedness proxy:** answer content tokens present in validly cited context / answer content tokens.
 - **Required-fact recall:** required phrases found in the candidate answer / expected phrases.
-- **Retrieval recall@k:** expected documents present in the ranked retrieved-document list / expected documents.
+- **Retrieval recall@k:** expected documents present in the first `k` entries of the ranked retrieved-document list / expected documents. `k` is optional (`k` argument, case field or API field); when omitted the whole ranking counts. Undefined (N/A, `null`) when no documents are expected. Document ids must be unique within a case.
 - **Retrieval MRR:** reciprocal rank of the first expected document in the ranked retrieved-document list.
 - **Latency:** candidate response time compared with the configured maximum.
 - **Estimated cost:** candidate model cost compared with the configured budget.

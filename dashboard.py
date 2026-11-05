@@ -4,25 +4,25 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 from app.report import evaluate_batch
 
-
 ROOT = Path(__file__).parent
 DATASET = ROOT / "data" / "evaluation_cases.json"
 
 
 @st.cache_data
-def load_report(dataset_path: str) -> dict[str, object]:
+def load_report(dataset_path: str) -> dict[str, Any]:
     """Evaluate the synthetic golden set and cache the deterministic report."""
     cases = json.loads(Path(dataset_path).read_text(encoding="utf-8"))
     return evaluate_batch(cases)
 
 
-def result_frame(report: dict[str, object]) -> pd.DataFrame:
+def result_frame(report: dict[str, Any]) -> pd.DataFrame:
     """Flatten evaluation results for interactive review."""
     rows = []
     for result in report["results"]:
