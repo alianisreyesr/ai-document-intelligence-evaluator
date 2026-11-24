@@ -1,4 +1,4 @@
-"""Batch evaluation reporting and recruiter-facing dashboard generation."""
+"""Batch evaluation reporting and dashboard generation."""
 
 from __future__ import annotations
 
