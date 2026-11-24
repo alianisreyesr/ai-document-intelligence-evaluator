@@ -100,10 +100,6 @@ CASE-002 FAIL citation_validity=0.50 coverage=0.50 groundedness=0.64 facts=0.50 
 
 Lexical overlap is a transparent baseline, not semantic entailment. Ranked recall@k and MRR now expose retrieval quality independently from answer quality. A production evaluation program would additionally use calibrated model-based graders, adversarial datasets, bias and safety testing, prompt/model versioning, privacy controls, monitoring, and sampled expert review.
 
-## Target roles
-
-AI Application Engineer · AI Quality Engineer · Backend Engineer · Data Scientist
-
 ## Portfolio Ecosystem
 
 Related portfolio projects (synthetic data only):
